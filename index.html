@@ -43,22 +43,17 @@
       4. Cole as configurações no objeto firebaseConfig abaixo.
     */
    const firebaseConfig = {
-     apiKey: "AIzaSyBMsCpsD6NxkuMJAPcGncJ-h1FYobDkdvc",
-     authDomain: "chatnfc.firebaseapp.com",
-     databaseURL: "https://chatnfc-default-rtdb.firebaseio.com",
-     projectId: "chatnfc",
-     storageBucket: "chatnfc.firebasestorage.app",
-     messagingSenderId: "613740193734",
-     appId: "1:613740193734:web:7e215437796c2bdfedb4c7"
+  apiKey: "AIzaSyBMsCpsD6NxkuMJAPcGncJ-h1FYobDkdvc",
+  authDomain: "chatnfc.firebaseapp.com",
+  databaseURL: "https://chatnfc-default-rtdb.firebaseio.com",
+  projectId: "chatnfc",
+  storageBucket: "chatnfc.firebasestorage.app",
+  messagingSenderId: "613740193734",
+  appId: "1:613740193734:web:ceb4e6612163f329edb4c7"
 };
 
-     // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-
-    // Inicializa o Firebase com as configurações do seu projeto
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
     /* 
       ================================
       PASSO 2 – LÓGICA DE PAREAMENTO (SIMULAÇÃO "ATIVAR NFC")
