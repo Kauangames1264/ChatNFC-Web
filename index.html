@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat NFC Simulado com Pareamento Automático</title>
+  <style>
+    /* Estilos básicos para a página */
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    #status { margin-bottom: 1em; font-size: 1.1em; }
+    #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 1em; margin-top: 1em; }
+    #chat { display: none; margin-top: 1em; }
+    button { cursor: pointer; padding: 0.5em 1em; margin-top: 1em; }
+    input[type="text"] { padding: 0.5em; width: 70%; }
+  </style>
+</head>
+<body>
+  <h1>Chat NFC Simulado</h1>
+  <!-- Botão para "Ativar NFC" (simulação) -->
+  <button id="activateNFC">Ativar NFC</button>
+  <!-- Área para exibir mensagens de status e instruções -->
+  <div id="status"></div>
+
+  <!-- Área do chat que será exibida após o pareamento -->
+  <div id="chat">
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="Digite sua mensagem">
+    <button id="sendMessage">Enviar</button>
+  </div>
+
+  <!-- Inclusão dos Scripts do Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  
+  <script>
+    /* 
+      ================================
+      PASSO 1 – CONFIGURAR O FIREBASE
+      ================================
+      
+      1. Crie um projeto no Firebase Console (https://console.firebase.google.com/).
+      2. Ative o Realtime Database no modo de teste.
+      3. Adicione um app Web e copie as configurações (apiKey, authDomain, etc).
+      4. Cole as configurações no objeto firebaseConfig abaixo.
+    */
+   const firebaseConfig = {
+     apiKey: "AIzaSyBMsCpsD6NxkuMJAPcGncJ-h1FYobDkdvc",
+     authDomain: "chatnfc.firebaseapp.com",
+     databaseURL: "https://chatnfc-default-rtdb.firebaseio.com",
+     projectId: "chatnfc",
+     storageBucket: "chatnfc.firebasestorage.app",
+     messagingSenderId: "613740193734",
+     appId: "1:613740193734:web:7e215437796c2bdfedb4c7"
+};
+
+     // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+
+    // Inicializa o Firebase com as configurações do seu projeto
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    /* 
+      ================================
+      PASSO 2 – LÓGICA DE PAREAMENTO (SIMULAÇÃO "ATIVAR NFC")
+      ================================
+      
+      Objetivo: Quando o usuário clica em "Ativar NFC", o dispositivo passa a estar "visível" e aguarda um outro dispositivo.
+      
+      2.1. Geração de um ID único para cada dispositivo:
+          - Usamos um número aleatório para identificar o usuário/dispositivo (ex.: user-1234).
+
+      2.2. Ao clicar em "Ativar NFC", o dispositivo consulta o nó 'waiting' no Firebase:
+          - Se já existir outro dispositivo esperando (e que não seja ele mesmo), cria um ID de conversa e envia uma solicitação de pareamento.
+          - Se não houver, registra-se como "esperando" (tornando-se visível) e aguarda que outro dispositivo faça a solicitação.
+    */
+    let userId = 'user-' + Math.floor(Math.random() * 10000);
+    let conversationId = null; // Será definido após o pareamento
+
+    // Referências aos elementos HTML
+    const statusDiv = document.getElementById('status');
+    const activateButton = document.getElementById('activateNFC');
+    const chatDiv = document.getElementById('chat');
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const sendMessageButton = document.getElementById('sendMessage');
+
+    // Função acionada quando o usuário clica em "Ativar NFC"
+    function ativarNFC() {
+      statusDiv.innerHTML = "Verificando disponibilidade de pareamento...";
+      // Referência ao nó "waiting" no Firebase
+      const waitingRef = database.ref('waiting');
+
+      // Consulta o nó "waiting" para verificar se existe um dispositivo esperando
+      waitingRef.once('value').then(snapshot => {
+        if (snapshot.exists()) {
+          // Se já existir um dispositivo esperando, obtém os dados
+          const waitingData = snapshot.val();
+          // Garante que não é o mesmo dispositivo
+          if (waitingData.userId && waitingData.userId !== userId) {
+            // Cria um ID único para a conversa, combinando os IDs dos dois dispositivos
+            conversationId = waitingData.userId + "_" + userId;
+            // Registra uma solicitação de pareamento no nó "pairingRequests" do dispositivo que estava esperando
+            database.ref('pairingRequests/' + waitingData.userId).set({
+              conversationId: conversationId,
+              from: userId,
+              timestamp: Date.now()
+            });
+            // Remove o dispositivo que estava em espera, pois o pareamento já ocorreu
+            waitingRef.remove();
+            statusDiv.innerHTML = "Conectado ao dispositivo " + waitingData.userId + ". Iniciando chat...";
+            iniciarChat();
+          } else {
+            // Caso raro: se por acaso for o mesmo dispositivo (não deveria ocorrer), entra em modo de espera
+            tornarVisivel();
+          }
+        } else {
+          // Se não há nenhum dispositivo esperando, o atual se registra como "visível"
+          tornarVisivel();
+        }
+      });
+    }
+
+    // Função para registrar o dispositivo como "esperando" e ficar aguardando um pareamento
+    function tornarVisivel() {
+      // Registra no nó 'waiting' do Firebase o ID do usuário e um timestamp
+      database.ref('waiting').set({
+        userId: userId,
+        timestamp: Date.now()
+      });
+      statusDiv.innerHTML = "Seu dispositivo está visível e aguardando conexão...";
+
+      // Adiciona um listener para verificar se outro dispositivo envia uma solicitação de pareamento
+      const pairingRef = database.ref('pairingRequests/' + userId);
+      pairingRef.on('value', snapshot => {
+        if (snapshot.exists()) {
+          // Se receber uma solicitação, obtém os dados do pareamento
+          const pairingData = snapshot.val();
+          conversationId = pairingData.conversationId;
+          statusDiv.innerHTML = "Conectado ao dispositivo " + pairingData.from + ". Iniciando chat...";
+          pairingRef.off(); // Remove o listener após o pareamento
+          iniciarChat();
+        }
+      });
+    }
+
+    /* 
+      ================================
+      PASSO 3 – INICIAR O CHAT
+      ================================
+      
+      Após o pareamento, os dois dispositivos precisam trocar mensagens.
+      
+      3.1. Definimos uma sala de conversa identificada por conversationId.
+      3.2. Exibimos a interface do chat (área de mensagens e input).
+      3.3. Conectamos ao nó 'conversations/<conversationId>' no Firebase, onde serão registradas as mensagens.
+      3.4. Adicionamos um listener para atualizar a interface quando novas mensagens chegarem.
+      3.5. Permitimos o envio de mensagens: ao clicar no botão "Enviar", a mensagem é gravada no Firebase.
+    */
+    function iniciarChat() {
+      // Exibe a área do chat
+      chatDiv.style.display = "block";
+
+      // Conecta ao nó de mensagens para esta conversa e ouve novas mensagens
+      const messagesRef = database.ref('conversations/' + conversationId);
+      messagesRef.on('child_added', snapshot => {
+        const msg = snapshot.val();
+        const msgDiv = document.createElement('div');
+        msgDiv.textContent = msg.user + ": " + msg.text;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+    }
+
+    // Envia mensagem para a conversa no Firebase
+    sendMessageButton.addEventListener('click', () => {
+      const text = messageInput.value.trim();
+      if (text !== '' && conversationId) {
+        const msgRef = database.ref('conversations/' + conversationId).push();
+        msgRef.set({
+          user: userId,
+          text: text,
+          timestamp: Date.now()
+        });
+        messageInput.value = '';
+      }
+    });
+
+    // Inicia o processo de pareamento ao clicar em "Ativar NFC"
+    activateButton = document.getElementById('activateNFC');
+    activateButton.addEventListener('click', ativarNFC);
+  </script>
+</body>
+</html>
